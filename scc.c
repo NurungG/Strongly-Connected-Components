@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 /* Defines */
 typedef int key_t;
 typedef key_t value_t;
@@ -27,6 +28,7 @@ struct list_s {
     struct node_s *tail;
 };
 
+// Stack structure (using linked list)
 struct stack_s {
     struct node_s *top;
 };
@@ -37,6 +39,8 @@ struct member_s {
     char phone[12];
     
     key_t leader;
+
+    // Adjacency list
     struct list_s *following;
     struct list_s *followed;
 };
@@ -70,25 +74,27 @@ void    Init();
 void    Setup();
 void    Execute();
 
-// Setup wrapper functions
-void    scc();
-void    dfs_phase1(key_t id);
-void    dfs_phase2(key_t id, key_t lead);
-
 // Execute wrapper functions
 int     execute_operation(char op);
 void    op_leader();
 void    op_follow();
 
+// SCC implementation
+void    scc();
+void    dfs_phase1(key_t id);
+void    dfs_phase2(key_t id, key_t lead);
 
 
 /* Global variables */
 member_t *member[MAX_MEMBER];
 int visit[MAX_MEMBER];
 stack_t *stk;
+
+// The number of *
 int members;
 int follows;
 int groups;
+
 
 /* Main function */
 int main() {
@@ -98,11 +104,18 @@ int main() {
     return 0;
 }
 
+
 /* Function implementation */
 
 /* Initiate global variables */
 void Init() {
     stk = stack_create();
+
+    // member[] <- 0
+    // visit[]  <- 0
+    // members  <- 0
+    // follows  <- 0
+    // groups   <- 0
 }
 
 /* Setup existing information(member, follow) from file */
@@ -225,7 +238,7 @@ int execute_operation(char op) {
     case 'A': // follow or unfollow
         op_follow();
         break;
-    case '0': // exit
+    case '0': // exit with group count
         printf("%d\n", groups);
         return EXIT_STATUS;
     default:
@@ -253,46 +266,22 @@ void op_leader() {
 /* Renew the follow information */
 void op_follow() {
     key_t u, v;
-    int i;
-
+    
     scanf("%d %d", &u, &v);
     
     if (list_remove(member[u]->following, v) == -1) {
+        // Case of follow
         list_insert(member[u]->following, v);
         list_insert(member[v]->followed, u);
     } else {
+        // Case of unfollow
         list_remove(member[v]->followed, u);
     }
 
+    // Renew SCC
     scc();
 
     printf("%d\n", member[u]->leader);
-}
-
-/* Create list */
-list_t *list_create() {
-    list_t *list = NULL;
-
-    if ((list = malloc(sizeof(list_t))) == NULL) {
-        return NULL;
-    }
-
-    list->head = NULL;
-    
-    return list;
-}
-
-/* Create stack */
-stack_t *stack_create() {
-    stack_t *stack = NULL;
-
-    if ((stack = malloc(sizeof(stack_t))) == NULL) {
-        return NULL;
-    }
-
-    stack->top = NULL;
-
-    return stack;
 }
 
 /* Create node */
@@ -314,19 +303,17 @@ void node_delete(node_t *node) {
     free(node);
 }
 
-/* Create member */
-member_t *member_create() {
-    member_t *member;
+/* Create list */
+list_t *list_create() {
+    list_t *list = NULL;
 
-    if ((member = malloc(sizeof(member_t))) == NULL) {
+    if ((list = malloc(sizeof(list_t))) == NULL) {
         return NULL;
     }
-    
-    member->leader = -1;
-    member->following = list_create();
-    member->followed  = list_create();
 
-    return member;
+    list->head = NULL;
+    
+    return list;
 }
 
 /* Insert an element to list */
@@ -378,6 +365,19 @@ int list_remove(list_t *list, value_t v) {
     return -1;
 }
 
+/* Create stack */
+stack_t *stack_create() {
+    stack_t *stack = NULL;
+
+    if ((stack = malloc(sizeof(stack_t))) == NULL) {
+        return NULL;
+    }
+
+    stack->top = NULL;
+
+    return stack;
+}
+
 /* Push an element to stack */
 int stack_push(stack_t *stack, value_t v) {
     node_t *node = node_create();
@@ -408,3 +408,19 @@ int stack_pop(stack_t *stack) {
 
     return 0;
 }
+
+/* Create member */
+member_t *member_create() {
+    member_t *member;
+
+    if ((member = malloc(sizeof(member_t))) == NULL) {
+        return NULL;
+    }
+    
+    member->leader = -1;
+    member->following = list_create();
+    member->followed  = list_create();
+
+    return member;
+}
+
