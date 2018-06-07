@@ -28,7 +28,7 @@ struct list_s {
     struct node_s *tail;
 };
 
-// Stack structure (using linked list)
+// Stack structure
 struct stack_s {
     value_t *arr;
     int top;
@@ -55,7 +55,7 @@ typedef struct member_s member_t;
 
 // Node
 node_t *node_create();
-void    node_delete();
+void    node_delete(node_t *node);
 
 // List
 list_t *list_create();
@@ -380,6 +380,7 @@ stack_t *stack_create(int size) {
     }
 
     if ((stack->arr = malloc(sizeof(value_t) * size)) == NULL) {
+        free(stack);
         return NULL;
     }
 
@@ -403,6 +404,7 @@ value_t stack_top(stack_t *stack) {
     return (stack->arr)[stack->top];
 }
 
+/* Check the stack is empty */
 int stack_empty(stack_t *stack) {
     return (stack->top == -1);
 }
