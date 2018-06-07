@@ -30,7 +30,8 @@ struct list_s {
 
 // Stack structure (using linked list)
 struct stack_s {
-    struct node_s *top;
+    value_t *arr;
+    int top;
 };
 
 // Information of each member
@@ -62,9 +63,11 @@ int     list_insert(list_t *list, value_t v);
 int     list_remove(list_t *list, value_t v);
 
 // Stack
-stack_t *stack_create();
+stack_t *stack_create(int size);
 int      stack_push(stack_t *stack, value_t v);
 int      stack_pop(stack_t *stack);
+value_t  stack_top(stack_t *stack);
+int      stack_empty(stack_t *stack);
 
 // Member
 member_t *member_create();
@@ -86,7 +89,7 @@ void    dfs_phase2(key_t id, key_t lead);
 
 
 /* Global variables */
-member_t *member[MAX_MEMBER];
+member_t member[MAX_MEMBER];
 int visit[MAX_MEMBER];
 stack_t *stk;
 
@@ -109,9 +112,16 @@ int main() {
 
 /* Initiate global variables */
 void Init() {
-    stk = stack_create();
+    int i;
+    
+    for (i = 0; i < MAX_MEMBER; i++) {
+        member[i].leader = -1;
+        member[i].following = list_create();
+        member[i].followed  = list_create();
+    }
 
-    // member[] <- 0
+    stk = stack_create(MAX_MEMBER);
+
     // visit[]  <- 0
     // members  <- 0
     // follows  <- 0
@@ -139,16 +149,16 @@ void Setup() {
     for (i = 0; i < members; i++) {
         key_t id;
         fscanf(input, "%d", &id);
-        member[id] = member_create();
-        fscanf(input, "%s %s", member[id]->name, member[id]->phone);
+        //member[id] = member_create();
+        fscanf(input, "%s %s", member[id].name, member[id].phone);
     }
     for (i = 0; i < follows; i++) {
         key_t u, v;
         fscanf(input, "%d %d", &u, &v);
         
         // u -> v (u follows v)
-        list_insert(member[u]->following, v);
-        list_insert(member[v]->followed, u);    // transpose graph
+        list_insert(member[u].following, v);
+        list_insert(member[v].followed, u);    // transpose graph
     }
 
     // Setup strongly connected components 
@@ -164,38 +174,36 @@ void scc() {
     // Phase 1:
     // While performing a standard depth-first search on graph,
     // put the vertices in a stack their finishing times
-    for (i = 0; i < MAX_MEMBER; i++) {
-        if (member[i] != NULL) {
-            if (visit[i] == 0) {
-                dfs_phase1(i);
-            }
+    for (i = 0; i < members; i++) {
+        if (!visit[i]) {
+            dfs_phase1(i);
         }
     }
-    memset(visit, 0, MAX_MEMBER * sizeof(int));
+    memset(visit, 0, members * sizeof(int));
 
     // Phase 2:
     // A depth-first search is performed on transpose graph
     // To start search, vertices are popped from the stack
-    while (stk->top != NULL) {
-        key_t id = stk->top->value;
+    while (!stack_empty(stk)) {
+        key_t id = stack_top(stk);
         stack_pop(stk);
         
-        if (visit[id] == 0) {
+        if (!visit[id]) {
             dfs_phase2(id, id);
             ++groups;
         }
     }
-    memset(visit, 0, MAX_MEMBER * sizeof(int));
+    memset(visit, 0, members * sizeof(int));
 }
 
 /* DFS on phase 1 */
 void dfs_phase1(key_t id) {
-    node_t *iter = member[id]->following->head;
+    node_t *iter = member[id].following->head;
 
     visit[id] = 1;
     
     for (; iter != NULL; iter = iter->next) {
-        if (visit[iter->value] == 0) {
+        if (!visit[iter->value]) {
             dfs_phase1(iter->value);
         }
     }
@@ -205,13 +213,13 @@ void dfs_phase1(key_t id) {
 
 /* DFS on phase 2 */
 void dfs_phase2(key_t id, key_t lead) {
-    node_t *iter = member[id]->followed->head;
+    node_t *iter = member[id].followed->head;
 
     visit[id] = 1;
-    member[id]->leader = lead;
+    member[id].leader = lead;
 
     for (; iter != NULL; iter = iter->next) {
-        if (visit[iter->value] == 0) {
+        if (!visit[iter->value]) {
             dfs_phase2(iter->value, lead);
         }
     }
@@ -252,15 +260,13 @@ int execute_operation(char op) {
 
 /* Print information of leader */
 void op_leader() {
-    key_t id, leader_id;
-    member_t *leader;
+    key_t id, leader;
 
     scanf("%d", &id);
 
-    leader_id = member[id]->leader;
-    leader = member[leader_id];
+    leader = member[id].leader;
 
-    printf("%d %s %s\n", leader_id, leader->name, leader->phone);
+    printf("%d %s %s\n", leader, member[leader].name, member[leader].phone);
 }
 
 /* Renew the follow information */
@@ -269,19 +275,19 @@ void op_follow() {
     
     scanf("%d %d", &u, &v);
     
-    if (list_remove(member[u]->following, v) == -1) {
+    if (list_remove(member[u].following, v) == -1) {
         // Case of follow
-        list_insert(member[u]->following, v);
-        list_insert(member[v]->followed, u);
+        list_insert(member[u].following, v);
+        list_insert(member[v].followed, u);
     } else {
         // Case of unfollow
-        list_remove(member[v]->followed, u);
+        list_remove(member[v].followed, u);
     }
 
     // Renew SCC
     scc();
 
-    printf("%d\n", member[u]->leader);
+    printf("%d\n", member[u].leader);
 }
 
 /* Create node */
@@ -366,61 +372,37 @@ int list_remove(list_t *list, value_t v) {
 }
 
 /* Create stack */
-stack_t *stack_create() {
+stack_t *stack_create(int size) {
     stack_t *stack = NULL;
 
     if ((stack = malloc(sizeof(stack_t))) == NULL) {
         return NULL;
     }
 
-    stack->top = NULL;
+    if ((stack->arr = malloc(sizeof(value_t) * size)) == NULL) {
+        return NULL;
+    }
+
+    stack->top = -1;
 
     return stack;
 }
 
 /* Push an element to stack */
 int stack_push(stack_t *stack, value_t v) {
-    node_t *node = node_create();
-
-    if (node == NULL) {
-        return -1;
-    }
-
-    node->value = v;
-    node->next  = stack->top;
-    stack->top  = node;
-    
-    return 0;
+    (stack->arr)[++(stack->top)] = v;
 }
 
 /* Pop an element from stack */
 int stack_pop(stack_t *stack) {
-    node_t *tmp;
-
-    // Case of empty
-    if (stack->top == NULL) {
-        return -1;
-    }
-
-    tmp = stack->top;
-    stack->top = stack->top->next;
-    node_delete(tmp);
-
-    return 0;
+    --(stack->top);
 }
 
-/* Create member */
-member_t *member_create() {
-    member_t *member;
-
-    if ((member = malloc(sizeof(member_t))) == NULL) {
-        return NULL;
-    }
-    
-    member->leader = -1;
-    member->following = list_create();
-    member->followed  = list_create();
-
-    return member;
+/* Return top element from stack */
+value_t stack_top(stack_t *stack) {
+    return (stack->arr)[stack->top];
 }
 
+int stack_empty(stack_t *stack) {
+    return (stack->top == -1);
+}
